@@ -1,51 +1,45 @@
-CREATE VIEW rental_summary AS
+CREATE VIEW customer_rental_summary AS
 SELECT 
-    c.customer_id,
-    c.first_name,
-    c.last_name,
-    c.email,
-    COUNT(r.rental_id) AS rental_count
+  c.customer_id,
+  CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+  c.email,
+  COUNT(*) AS rental_count
 FROM 
-    customer c
-JOIN 
-    rental r ON c.customer_id = r.customer_id
+  customer AS c
+  JOIN rental AS r ON c.customer_id = r.customer_id
 GROUP BY 
-    c.customer_id, c.first_name, c.last_name, c.email;
+  c.customer_id;
 
 
-CREATE TEMPORARY TABLE payment_summary AS
-SELECT 
-    rs.customer_id,
+CREATE TEMPORARY TABLE customer_payment_summary AS (
+  SELECT 
+    crs.customer_id,
     SUM(p.amount) AS total_paid
-FROM 
-    rental_summary rs
-JOIN 
-    payment p ON rs.customer_id = p.customer_id
-GROUP BY 
-    rs.customer_id;
+  FROM 
+    customer_rental_summary AS crs
+    JOIN rental AS r ON crs.customer_id = r.customer_id
+    JOIN payment AS p ON r.rental_id = p.rental_id
+  GROUP BY 
+    crs.customer_id
+);
 
-WITH customer_summary AS (
-    SELECT 
-        rs.customer_id,
-        rs.first_name,
-        rs.last_name,
-        rs.email,
-        rs.rental_count,
-        ps.total_paid
-    FROM 
-        rental_summary rs
-    JOIN 
-        payment_summary ps ON rs.customer_id = ps.customer_id
+WITH customer_summary_report AS (
+  SELECT 
+    crs.customer_name,
+    crs.email,
+    crs.rental_count,
+    cps.total_paid
+  FROM 
+    customer_rental_summary AS crs
+    JOIN customer_payment_summary AS cps ON crs.customer_id = cps.customer_id
 )
+
 SELECT 
-    cs.first_name,
-    cs.last_name,
-    cs.email,
-    cs.rental_count,
-    cs.total_paid,
-    (cs.total_paid / cs.rental_count) AS average_payment_per_rental
+  *,
+  total_paid / rental_count AS average_payment_per_rental
 FROM 
-    customer_summary cs
+  customer_summary_report
 ORDER BY 
-    cs.first_name, cs.last_name;
+  rental_count DESC;
+
 
